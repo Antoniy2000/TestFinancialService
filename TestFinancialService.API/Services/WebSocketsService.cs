@@ -14,6 +14,7 @@ public class WebSocketsService
         _logger = logger;
     }
 
+    // and in this method we are just sending updates via socket, so it will guarantee high performance
     private async void TickersService_TickerPriceChanged(string ticker, double price)
     {
         var collection = _webSockets.Values.ToList()

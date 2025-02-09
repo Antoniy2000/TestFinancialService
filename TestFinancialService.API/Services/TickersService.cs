@@ -31,6 +31,7 @@ public class TickersService(ILogger<TickersService> logger)
                 Price = price
             });
         }
+        // here we are notificating about changes
         TickerPriceChanged?.Invoke(name, price);
     }
 }

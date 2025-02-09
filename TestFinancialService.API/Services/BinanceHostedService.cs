@@ -75,6 +75,7 @@ public class BinanceHostedService : IHostedService
 
             if (response != null && !string.IsNullOrEmpty(response.TickerName))
             {
+                // here we are caching price to service
                 _tickersService.SetPrice(response.TickerName, response.Price);
             }
         }
