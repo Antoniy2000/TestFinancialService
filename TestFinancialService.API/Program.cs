@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using TestFinancialService.API.Options;
 using TestFinancialService.API.Services;
 
@@ -15,10 +16,15 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
         builder.Services.Configure<BinanceOptions>(builder.Configuration.GetSection("Binance"));
+        builder.Logging.AddSimpleConsole(x =>
+        {
+            x.IncludeScopes = true;
+            x.TimestampFormat = "[dd.MM.yyyy hh:mm:ss.ms]";
+        });
 
         builder.Services.AddHostedService<BinanceHostedService>();
         builder.Services.AddSingleton<TickersService>();
-
+        builder.Services.AddSingleton<WebSocketsService>();
 
         var app = builder.Build();
 
@@ -34,7 +40,7 @@ public class Program
         app.MapControllers();
         app.UseWebSockets(new WebSocketOptions
         {
-            KeepAliveInterval = TimeSpan.FromSeconds(30),
+            //KeepAliveInterval = TimeSpan.FromSeconds(30),
         });
 
         app.Run();

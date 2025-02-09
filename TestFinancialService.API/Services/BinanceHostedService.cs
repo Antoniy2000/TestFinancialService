@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Net.WebSockets;
-using System.Text;
 using System.Text.Json;
 using TestFinancialService.API.Helpers;
 using TestFinancialService.API.Models.Binance;
@@ -15,23 +14,30 @@ public class BinanceHostedService : IHostedService
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
-    public BinanceHostedService(IOptions<BinanceOptions> options, TickersService tickersService)
+    private readonly ILogger _logger;
+    public BinanceHostedService(IOptions<BinanceOptions> options, TickersService tickersService, ILogger<BinanceHostedService> logger)
     {
         _options = options.Value;
         _tickersService = tickersService;
+        _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        _logger.LogDebug("Start executing");
+        if (!_options.Enabled)
+            return;
+
         foreach (var tickerName in _options.Tickers)
         {
             ListenTickerUpdatesAsync(tickerName, cancellationToken);
         }
-        return;
+        _logger.LogDebug("Start executed");
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        _logger.LogDebug("Stop executed");
         return Task.CompletedTask;
     }
 
@@ -48,28 +54,38 @@ public class BinanceHostedService : IHostedService
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError(ex, $"Connection to {name} failed");
+                }
 
+                if (webSocket.State == WebSocketState.Open)
+                {
+                    _logger.LogDebug($"Connected to {name} updates server");
                 }
             }
 
+            BinanceStreamInfo response = null;
             try
             {
-                var response = await webSocket.ReadAsJsonAsync<BinanceStreamInfo>(ct: ct);
-                if (response != null && !string.IsNullOrEmpty(response.TickerName))
-                {
-                    _tickersService.SetPrice(response.TickerName, response.Price);
-                }
+                response = await webSocket.ReadAsJsonAsync<BinanceStreamInfo>(ct: ct);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Failed to receive response from {name}");
+            }
 
+            if (response != null && !string.IsNullOrEmpty(response.TickerName))
+            {
+                _tickersService.SetPrice(response.TickerName, response.Price);
             }
         }
     }
 
     private async Task ConnectWebSocketAsync(ClientWebSocket webSocket, string name, CancellationToken ct)
     {
-        await webSocket.ConnectAsync(new Uri(Path.Combine(_options.Endpoint, "ws", name)), ct);
+        var url = new Uri(Path.Combine(_options.Endpoint, "ws", name));
+        _logger.LogInformation($"Connecting to {url}");
+
+        await webSocket.ConnectAsync(url, ct);
         var message = new BinanceRequest
         {
             Method = "SUBSCRIBE",
@@ -79,6 +95,8 @@ public class BinanceHostedService : IHostedService
         var ms = new MemoryStream();
         await JsonSerializer.SerializeAsync(ms, message, _jsonOptions, ct);
         await webSocket.SendAsync(ms.ToArray(), WebSocketMessageType.Text, true, ct);
-        _ = await webSocket.ReadAsJsonAsync<BinanceResponse>(ct: ct);
+
+        var res = await webSocket.ReadAsStringAsync(ct: ct);
+        _logger.LogDebug($"Received response from {url}: {res}");
     }
 }
