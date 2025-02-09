@@ -1,3 +1,6 @@
+using TestFinancialService.API.Options;
+using TestFinancialService.API.Services;
+
 namespace TestFinancialService.API;
 public class Program
 {
@@ -11,6 +14,11 @@ public class Program
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
+        builder.Services.Configure<BinanceOptions>(builder.Configuration.GetSection("Binance"));
+
+        builder.Services.AddHostedService<BinanceHostedService>();
+        builder.Services.AddSingleton<TickersService>();
+
 
         var app = builder.Build();
 
@@ -24,6 +32,10 @@ public class Program
         app.UseHttpsRedirection();
 
         app.MapControllers();
+        app.UseWebSockets(new WebSocketOptions
+        {
+            KeepAliveInterval = TimeSpan.FromSeconds(30),
+        });
 
         app.Run();
     }
